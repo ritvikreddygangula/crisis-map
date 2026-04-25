@@ -1,0 +1,132 @@
+{
+  "project_name": "ReliefRoute",
+  "hackathon": "LA Hacks",
+  "track": "Arista Networks - Connect the Dots",
+  "goal": "Build a simple, polished hackathon MVP that helps people find emergency resources during outages, heat waves, wildfires, or local emergencies.",
+  "core_pitch": "ReliefRoute is a real-time emergency resource heatmap that connects people to nearby shelters, water stations, charging spots, Wi-Fi locations, clinics, and cooling centers. It recommends the best nearby resource using availability, distance, trust score, and service match.",
+  "tech_stack": {
+    "frontend": "Next.js with TypeScript and Tailwind CSS",
+    "backend": "Next.js API routes or server actions",
+    "database": "MongoDB Atlas with Mongoose",
+    "maps": "Google Maps API preferred, fallback UI allowed",
+    "auth": "No full auth for MVP. Use anonymous localStorage userId for reports."
+  },
+  "mvp_features": [
+    "Landing page",
+    "Emergency type selector",
+    "Need filters",
+    "Map or map-like resource view",
+    "Resource markers/cards",
+    "Best recommended resource card",
+    "Resource detail modal",
+    "Community report form",
+    "MongoDB resource and report storage",
+    "Simple trust score calculation",
+    "Seeded demo scenario for a Los Angeles power outage"
+  ],
+  "do_not_build_yet": [
+    "Full authentication",
+    "Complex admin dashboard",
+    "Real-time WebSockets",
+    "Complex AI chatbot",
+    "Multiple external emergency APIs",
+    "Overcomplicated routing engine"
+  ],
+  "demo_scenario": {
+    "incident": "Power outage in Los Angeles",
+    "user_need": ["power", "wifi"],
+    "flow": [
+      "User opens ReliefRoute",
+      "User selects Power Outage",
+      "User selects Power and Wi-Fi",
+      "App shows nearby resources",
+      "App recommends best open trusted resource",
+      "User submits a report",
+      "Resource trust/status updates"
+    ]
+  },
+  "major_parts": [
+    {
+      "part": 1,
+      "name": "Project Setup and UI Shell",
+      "owner": "Person 1",
+      "primary_agent": "senior-architect",
+      "implementation_agent": "junior-frontend-dev",
+      "deliverables": [
+        "Next.js setup",
+        "Tailwind setup",
+        "Landing page",
+        "Main app shell",
+        "Static demo resource data",
+        "Basic README",
+        "HANDOFF.md"
+      ]
+    },
+    {
+      "part": 2,
+      "name": "MongoDB Backend",
+      "owner": "Person 2",
+      "primary_agent": "senior-architect",
+      "implementation_agent": "junior-backend-dev",
+      "deliverables": [
+        "MongoDB connection",
+        "Resource model",
+        "Report model",
+        "GET resources endpoint",
+        "POST report endpoint",
+        "Seed demo data",
+        "Updated HANDOFF.md"
+      ]
+    },
+    {
+      "part": 3,
+      "name": "Map and Filters",
+      "owner": "Person 3",
+      "primary_agent": "junior-frontend-dev",
+      "implementation_agent": "junior-frontend-dev",
+      "deliverables": [
+        "Map view",
+        "Resource markers",
+        "Resource cards",
+        "Need filters",
+        "Best recommendation card",
+        "Updated HANDOFF.md"
+      ]
+    },
+    {
+      "part": 4,
+      "name": "Reports and Trust Score",
+      "owner": "Person 4",
+      "primary_agent": "junior-backend-dev",
+      "implementation_agent": "debugger",
+      "deliverables": [
+        "Report form",
+        "Save report to MongoDB",
+        "Update resource status",
+        "Calculate trust score",
+        "Show recent update",
+        "Updated HANDOFF.md"
+      ]
+    },
+    {
+      "part": 5,
+      "name": "Demo Polish and Submission",
+      "owner": "Person 5",
+      "primary_agent": "hackathon-judge",
+      "implementation_agent": "qa-reviewer",
+      "deliverables": [
+        "Demo script",
+        "README polish",
+        "UI copy polish",
+        "Devpost description",
+        "Final QA pass",
+        "Final HANDOFF.md"
+      ]
+    }
+  ],
+  "agent_workflow_rule": "For each major part, use senior-architect first to inspect and plan. Then use the correct junior agent to implement. Then use debugger if anything fails. Then use qa-reviewer. End with handoff-manager.",
+  "no_hallucination_rule": "Before making claims or editing code, inspect the actual files. Do not assume file names, components, APIs, schemas, or installed packages. If unsure, search the repo.",
+  "debug_rule": "When errors happen, try up to 3 focused debugging attempts. Inspect the error and relevant files before editing. Apply minimal fixes. If unresolved, document the blocker in HANDOFF.md.",
+  "handoff_rule": "At the end of every session, update HANDOFF.md with completed work, changed files, commands run, what works, what does not work, blockers, exact next task, and recommended next agent.",
+  "first_task": "Start Part 1 only. Inspect the current folder. If no app exists, create a Next.js TypeScript Tailwind app structure. Build the landing page and basic UI shell. Use static demo data first. Do not implement MongoDB yet. End by creating HANDOFF.md."
+}
