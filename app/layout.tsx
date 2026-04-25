@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 
 const geist = Geist({ subsets: ["latin"] });
 
+// hi i am ritvik redddy
 export const metadata: Metadata = {
   title: "ReliefRoute – Find Emergency Resources Near You",
   description:
