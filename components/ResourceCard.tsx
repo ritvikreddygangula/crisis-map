@@ -32,15 +32,30 @@ function TrustBar({ score }: { score: number }) {
 interface Props {
   resource: Resource;
   isBestPick?: boolean;
+  isSelected?: boolean;
+  isHovered?: boolean;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
-export default function ResourceCard({ resource, isBestPick = false }: Props) {
+export default function ResourceCard({
+  resource,
+  isBestPick = false,
+  isSelected = false,
+  isHovered = false,
+  onMouseEnter,
+  onMouseLeave,
+}: Props) {
   const status = STATUS_CONFIG[resource.status];
 
   return (
     <div
-      className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 transition-shadow hover:shadow-md ${
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 transition-shadow hover:shadow-md cursor-pointer ${
         isBestPick ? "border-red-400 ring-2 ring-red-100" : "border-gray-200"
+      } ${isSelected ? "ring-2 ring-blue-500 ring-offset-2" : ""} ${
+        isHovered && !isSelected && !isBestPick ? "ring-2 ring-blue-400" : ""
       }`}
     >
       {/* Header row */}

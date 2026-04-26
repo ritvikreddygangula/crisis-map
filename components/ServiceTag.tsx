@@ -1,12 +1,10 @@
 import { ServiceType } from "@/types";
 
 const SERVICE_CONFIG: Record<ServiceType, { label: string; icon: string; color: string }> = {
-  power:   { label: "Charging",  icon: "⚡", color: "bg-yellow-100 text-yellow-800" },
+  shelter: { label: "Shelter",   icon: "🏠", color: "bg-purple-100 text-purple-800" },
   wifi:    { label: "Wi-Fi",     icon: "📶", color: "bg-blue-100 text-blue-800" },
   water:   { label: "Water",     icon: "💧", color: "bg-cyan-100 text-cyan-800" },
-  shelter: { label: "Shelter",   icon: "🏠", color: "bg-purple-100 text-purple-800" },
   medical: { label: "Medical",   icon: "🏥", color: "bg-red-100 text-red-800" },
-  cooling: { label: "Cooling",   icon: "❄️", color: "bg-sky-100 text-sky-800" },
   food:    { label: "Food",      icon: "🍽️", color: "bg-orange-100 text-orange-800" },
 };
 
