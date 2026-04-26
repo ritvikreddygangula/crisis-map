@@ -12,9 +12,9 @@ import {
 } from '@vis.gl/react-google-maps';
 import { Resource, ResourceStatus } from '@/types';
 
-// AZ geographic center — zoom 7 fits the full state with all pins visible
-const AZ_CENTER = { lat: 34.0, lng: -111.5 };
-const DEFAULT_ZOOM = 7;
+// Phoenix center — zoom 10 fits metro area
+const PHOENIX_CENTER = { lat: 33.456, lng: -111.98 };
+const DEFAULT_ZOOM = 10;
 
 const STATUS_COLORS: Record<ResourceStatus, string> = {
   open: '#16a34a',
@@ -28,6 +28,12 @@ interface Props {
   selectedId: string | null;
   onMarkerClick: (r: Resource) => void;
   showHeatmap: boolean;
+  hoveredId?: string | null;
+  onMarkerHover?: (id: string | null) => void;
+  onBoundsChanged?: (visibleIds: Set<string>) => void;
+  mapZoom?: number;
+  onMapZoomChange?: (zoom: number) => void;
+  panTarget?: { lat: number; lng: number } | null;
 }
 
 interface HeatmapLayerType {
@@ -65,31 +71,82 @@ function HeatmapOverlay({ resources }: { resources: Resource[] }) {
   return null;
 }
 
+function PanController({ panTarget }: { panTarget: { lat: number; lng: number } | null | undefined }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map || !panTarget) return;
+    map.panTo(panTarget);
+  }, [map, panTarget]);
+  return null;
+}
+
+function BoundsWatcher({
+  resources,
+  onBoundsChanged,
+}: {
+  resources: Resource[];
+  onBoundsChanged: (ids: Set<string>) => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    const listener = map.addListener('bounds_changed', () => {
+      const bounds = map.getBounds();
+      if (!bounds) return;
+      const visible = new Set(
+        resources
+          .filter((r) => bounds.contains({ lat: r.location.lat, lng: r.location.lng }))
+          .map((r) => r.id)
+      );
+      onBoundsChanged(visible);
+    });
+    return () => google.maps.event.removeListener(listener);
+  }, [map, resources, onBoundsChanged]);
+
+  return null;
+}
+
 export default function ResourceMap({
   resources,
   selectedId,
   onMarkerClick,
   showHeatmap,
+  hoveredId = null,
+  onMarkerHover,
+  onBoundsChanged,
+  mapZoom,
+  onMapZoomChange,
+  panTarget,
 }: Props) {
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const openResource = resources.find((r) => r.id === openInfoId) ?? null;
 
   function handleMarkerClick(r: Resource) {
-    setOpenInfoId(r.id);
+    setOpenInfoId(null);
     onMarkerClick(r);
   }
 
+  const zoomProps =
+    mapZoom !== undefined && onMapZoomChange !== undefined
+      ? {
+          zoom: mapZoom,
+          onCameraChanged: (e: { detail: { zoom: number } }) =>
+            onMapZoomChange(e.detail.zoom),
+        }
+      : {
+          defaultZoom: DEFAULT_ZOOM,
+        };
+
   return (
-    // Height lives here on a plain div — Map fills it 100%
-    <div className="relative w-full" style={{ height: 'clamp(350px, 60vh, 640px)' }}>
+    <div className="relative w-full h-full">
       <APIProvider
         apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? ''}
         libraries={['visualization']}
       >
-        {/* DEMO_MAP_ID is Google's reserved test map ID — works without creating one in Cloud Console */}
         <Map
-          defaultCenter={AZ_CENTER}
-          defaultZoom={DEFAULT_ZOOM}
+          defaultCenter={PHOENIX_CENTER}
+          {...zoomProps}
           mapId="DEMO_MAP_ID"
           style={{ width: '100%', height: '100%' }}
           gestureHandling="greedy"
@@ -100,13 +157,21 @@ export default function ResourceMap({
               key={r.id}
               position={{ lat: r.location.lat, lng: r.location.lng }}
               onClick={() => handleMarkerClick(r)}
+              onMouseEnter={() => {
+                setOpenInfoId(r.id);
+                onMarkerHover?.(r.id);
+              }}
+              onMouseLeave={() => {
+                setOpenInfoId(null);
+                onMarkerHover?.(null);
+              }}
               title={r.name}
             >
               <Pin
                 background={STATUS_COLORS[r.status] ?? STATUS_COLORS.unknown}
                 glyphColor="#ffffff"
                 borderColor="#ffffff"
-                scale={r.id === selectedId ? 1.35 : 1}
+                scale={r.id === selectedId || r.id === hoveredId ? 1.35 : 1}
               />
             </AdvancedMarker>
           ))}
@@ -145,6 +210,12 @@ export default function ResourceMap({
           )}
 
           {showHeatmap && <HeatmapOverlay resources={resources} />}
+
+          <PanController panTarget={panTarget} />
+
+          {onBoundsChanged && (
+            <BoundsWatcher resources={resources} onBoundsChanged={onBoundsChanged} />
+          )}
         </Map>
       </APIProvider>
     </div>

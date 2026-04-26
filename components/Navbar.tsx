@@ -17,12 +17,6 @@ export default function Navbar() {
         <nav className="flex items-center gap-3">
           <Link
             href="/resources"
-            className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Resources
-          </Link>
-          <Link
-            href="/resources"
             className="text-sm bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-1.5 rounded-lg transition-colors"
           >
             Find Help Now

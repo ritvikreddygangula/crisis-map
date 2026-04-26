@@ -1,12 +1,10 @@
 export type ResourceStatus = "open" | "limited" | "closed" | "unknown";
 
 export type ServiceType =
-  | "power"
+  | "shelter"
   | "wifi"
   | "water"
-  | "shelter"
   | "medical"
-  | "cooling"
   | "food";
 
 export type EmergencyType =
