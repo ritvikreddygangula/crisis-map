@@ -4,6 +4,7 @@ import { Suspense, useState, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { EMERGENCY_SCENARIOS, getBestResource } from "@/lib/demo-data";
 import ResourceCard from "@/components/ResourceCard";
+import ReportForm from "@/components/ReportForm";
 import ResourceMap from "@/components/ResourceMap";
 import HeatAlertBanner from "@/components/HeatAlertBanner";
 import ServiceTag, { SERVICE_CONFIG } from "@/components/ServiceTag";
@@ -39,13 +40,18 @@ function ResourcesContent() {
   const [heatAlerts, setHeatAlerts] = useState<HeatAlert[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [activeServices, setActiveServices] = useState<ServiceType[]>([]);
+  // Pre-apply the needs from the selected emergency scenario so the map
+  // arrives filtered to what's actually relevant (shelter+wifi for outages, etc.)
+  const [activeServices, setActiveServices] = useState<ServiceType[]>(
+    () => scenario.defaultNeeds
+  );
   const [statusFilter, setStatusFilter] = useState<ResourceStatus | "all">("all");
   const [minTrust, setMinTrust] = useState<number>(0);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [mapZoom, setMapZoom] = useState(10);
   const [panTarget, setPanTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [reportingResource, setReportingResource] = useState<Resource | null>(null);
 
   useEffect(() => {
     Promise.allSettled([
@@ -104,7 +110,10 @@ function ResourcesContent() {
         if (statusFilter !== "all" && r.status !== statusFilter) return false;
         if (r.trustScore < minTrust) return false;
         if (activeServices.length > 0) {
-          if (!activeServices.every((s) => r.services.includes(s))) return false;
+          // OR logic: show resources that offer at least one of the selected services.
+          // AND would intersect to zero for multi-service emergency presets (e.g. shelter+wifi
+          // finds nothing because no single resource offers both).
+          if (!activeServices.some((s) => r.services.includes(s))) return false;
         }
         return true;
       })
@@ -118,6 +127,12 @@ function ResourcesContent() {
   }, [filtered, visibleIds]);
 
   const bestPick = useMemo(() => getBestResource(listItems), [listItems]);
+
+  // Best pick is always rendered first regardless of sort position.
+  const orderedListItems = useMemo(() => {
+    if (!bestPick) return listItems;
+    return [bestPick, ...listItems.filter((r) => r.id !== bestPick.id)];
+  }, [listItems, bestPick]);
 
   const hasActiveFilters =
     statusFilter !== "all" ||
@@ -235,7 +250,7 @@ function ResourcesContent() {
             ) : (
               <span className="text-xs text-gray-500">
                 Showing{" "}
-                <span className="font-semibold text-gray-700">{listItems.length}</span>{" "}
+                <span className="font-semibold text-gray-700">{orderedListItems.length}</span>{" "}
                 of{" "}
                 <span className="font-semibold text-gray-700">{filtered.length}</span>
               </span>
@@ -249,7 +264,7 @@ function ResourcesContent() {
                   Clear filters
                 </button>
               )}
-              {listItems.length < filtered.length && (
+              {orderedListItems.length < filtered.length && (
                 <button
                   onClick={() => setMapZoom((z) => Math.max(z - 2, 4))}
                   className="text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full border border-blue-200 transition-colors"
@@ -268,7 +283,7 @@ function ResourcesContent() {
                   <div key={i} className="h-36 bg-gray-100 rounded-2xl animate-pulse" />
                 ))}
               </>
-            ) : listItems.length === 0 ? (
+            ) : orderedListItems.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <div className="text-3xl mb-2">🔍</div>
                 <p className="font-medium text-sm">No resources match your filters.</p>
@@ -280,7 +295,7 @@ function ResourcesContent() {
                 </button>
               </div>
             ) : (
-              listItems.map((r) => (
+              orderedListItems.map((r) => (
                 <div
                   key={r.id}
                   id={`card-${r.id}`}
@@ -296,12 +311,41 @@ function ResourcesContent() {
                     isHovered={r.id === hoveredId}
                     onMouseEnter={() => setHoveredId(r.id)}
                     onMouseLeave={() => setHoveredId(null)}
+                    onReport={() => setReportingResource(r)}
                   />
                 </div>
               ))
             )}
           </div>
         </div>
+
+        {/* Report form modal */}
+        {reportingResource && (
+          <ReportForm
+            resource={reportingResource}
+            onClose={() => setReportingResource(null)}
+            onSuccess={() => {
+              setReportingResource(null);
+              // re-fetch all three APIs to refresh the map
+              setLoading(true);
+              Promise.allSettled([
+                fetch("/api/arcgis-resources").then((r) => r.json()),
+                fetch("/api/wifi-resources").then((r) => r.json()),
+                fetch("/api/medical-resources").then((r) => r.json()),
+              ])
+                .then((results) => {
+                  const merged: Resource[] = [];
+                  for (const result of results) {
+                    if (result.status === "fulfilled" && Array.isArray(result.value))
+                      merged.push(...result.value);
+                  }
+                  if (merged.length > 0) setResources(merged);
+                })
+                .catch(() => {})
+                .finally(() => setLoading(false));
+            }}
+          />
+        )}
 
         {/* RIGHT COLUMN: map (sticky, fills viewport height) */}
         <div className="flex-1 sticky top-0 h-full flex flex-col min-h-75">

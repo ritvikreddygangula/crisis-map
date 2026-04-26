@@ -73,13 +73,32 @@ export async function GET() {
       const arcgisResources = await fetchFromArcGIS();
 
       if (arcgisResources && arcgisResources.length > 0) {
-        // Upsert all resources in parallel
+        // Upsert all resources in parallel.
+        // $set: fields derived from ArcGIS that are always safe to overwrite (name, location, etc.)
+        // $setOnInsert: user-mutable fields (trustScore, status, lastUpdated) only written on first insert,
+        //               so community reports are never overwritten by a re-sync.
         await Promise.all(
           arcgisResources.map((resource) =>
             ResourceModel.findOneAndUpdate(
               { id: resource.id },
-              resource,
-              { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
+              {
+                $set: {
+                  name: resource.name,
+                  type: resource.type,
+                  address: resource.address,
+                  location: resource.location,
+                  services: resource.services,
+                  capacity: resource.capacity,
+                  notes: resource.notes,
+                  recommendationScore: resource.recommendationScore,
+                },
+                $setOnInsert: {
+                  status: resource.status,
+                  trustScore: resource.trustScore,
+                  lastUpdated: resource.lastUpdated,
+                },
+              },
+              { upsert: true, returnDocument: 'after' }
             )
           )
         );
