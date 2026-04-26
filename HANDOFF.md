@@ -2,68 +2,85 @@
 
 ## Current Part
 
-Part: 3 — Map and Filters (complete, ArcGIS + NWS integrated)
+Part 3 — Map and Resource Display (complete, extended with MongoDB sync, two-column layout, multi-source data, and cross-linking UX)
 
 ---
 
-## Completed (Part 3 — final state)
+## Completed
 
-### Map overhaul
-- Map re-centered on Phoenix metro (`33.456, -111.980`), zoom 11 — shows Tempe, Phoenix, and Scottsdale simultaneously
-- Map height changed to `clamp(350px, 60vh, 640px)` — dominant visual on the page
-- Unknown status marker (gray) added to the legend
-- Loading indicator in the map header while ArcGIS fetch is in progress
+### MongoDB sync for ArcGIS data
+- `/app/api/arcgis-resources/route.ts` is now MongoDB-backed
+- Module-level `lastSyncedAt` tracks sync time with a 5-minute interval
+- On first request: fetches from ArcGIS, upserts records to MongoDB via `ResourceModel.findOneAndUpdate({ id }, resource, { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true })`
+- Subsequent requests within 5 minutes are served from MongoDB
+- Falls back to a direct ArcGIS fetch if MongoDB is unreachable
+- Fixed Mongoose deprecation: `new: true` replaced with `returnDocument: 'after'`
 
-### Live ArcGIS data — Arizona Heat Preparedness Network
-- Created [app/api/arcgis-resources/route.ts](app/api/arcgis-resources/route.ts)
-- Queries the Arizona ADHS FeatureServer at layer 19:
-  `https://services1.arcgis.com/mpVYz37anSdrK4d8/arcgis/rest/services/AZCoolingandHydration/FeatureServer/19`
-- WHERE clause: `UPPER(City) IN ('PHOENIX','SCOTTSDALE','TEMPE')` — up to 300 results
-- Output SR 4326 (lat/lng); geometry returned as `{ x: lng, y: lat }`
-- Transforms ArcGIS features → `Resource` type using fields: `Facility`, `Organization`, `HydrationActivities`, `CollectionActivities`, `Hydration`, `Collection`, `Address`, `City`, `Zip`, `SeasonStatus`, `Open24seven`, `PopupHours`, `Pets`, `PrimaryPhone`
-- Resource ID format: `arcgis-{OBJECTID}`
-- Status: `SeasonStatus = "Active"` → open, `"Inactive"` → closed, other → unknown
-- Type detection: Cooling Center (default), Hydration Station, Respite Center, Donation Site
-- Services derived from activity fields + hydration/collection flags
-- `recommendationScore` computed server-side (50% status + 30% trust + 20% service breadth)
-- Response cached 5 minutes via `next: { revalidate: 300 }`
-- Graceful error handling: returns `{ error }` with 502 or 500 on failure; frontend falls back to DEMO_RESOURCES
+### Booking.com-style two-column layout
+- `app/resources/page.tsx` overhauled to a two-column sticky layout
+- Left column (420px, scrollable): filters and resource list
+- Right column (flex-1, sticky): map fills full viewport height
+- `HeatAlertBanner` remains full-width above the two-column wrapper
+- Stacks vertically on mobile
 
-### NWS heat alerts
-- Created [app/api/heat-alerts/route.ts](app/api/heat-alerts/route.ts)
-- Calls `https://api.weather.gov/alerts/active?area=AZ&status=actual`
-- Filters for: Excessive Heat Warning, Excessive Heat Watch, Heat Advisory, Heat Wave Warning
-- Returns array of `HeatAlert` objects (id, event, headline, severity, urgency, expires, description)
-- Returns `[]` on any fetch failure — non-crashing
-- Response cached 5 minutes
+### Map bounds filtering and Show More
+- `BoundsWatcher` component inside `<Map>` listens to `bounds_changed`, `tilesloaded`, and calls `update()` immediately on effect run so bounds are computed as soon as resources load
+- List filters to only show resources visible in current map viewport
+- "Show more" button zooms map out by 2 levels
+- "Showing X of Y" count displayed below the list
 
-### HeatAlertBanner component
-- Created [components/HeatAlertBanner.tsx](components/HeatAlertBanner.tsx)
-- Renders full-bleed above page content when heat alerts are active
-- Red background for `severity = "Extreme"`, orange for others
-- Shows top alert headline; "+N more" chip if multiple alerts
-- Dismissable with × button
-- Returns null when no alerts (currently no active heat alerts — pre-season)
+### Hover cross-linking
+- Hovering a map marker: InfoWindow appears, marker scales up
+- Clicking a map marker: InfoWindow closes, scrolls to matching card
+- Hovering a card: blue ring on card, corresponding marker scales up
+- Card click: `map.panTo()` via `PanController` component inside ResourceMap
 
-### Resources page changes
-- [app/resources/page.tsx](app/resources/page.tsx): Primary fetch now targets `/api/arcgis-resources`; falls back silently to `DEMO_RESOURCES`
-- Both fetches happen in a single `useEffect` (resources + heat alerts) on mount
-- Header badge shows "Live · Phoenix Metro" when ArcGIS data loaded, "Demo · Los Angeles" when fallback
-- Subheader shows "Tempe, Phoenix & Scottsdale" context when live data is active
-- Default emergency scenario changed to `heat_wave` to match the ArcGIS data theme
-- `/api/resources` (MongoDB) and `/api/seed` remain available for Part 4 community reports
+### Card click pan fix
+- Added `panTarget` state and `PanController` child component in ResourceMap
+- Clicking a card pans the map to that resource's location
+
+### New data sources
+- `/app/api/wifi-resources/route.ts`: 52 Phoenix City public Wi-Fi locations from Phoenix city ArcGIS GeoJSON
+- `/app/api/medical-resources/route.ts`: up to 80 hospitals, clinics, and doctor offices in Phoenix metro from OpenStreetMap Overpass API
+- `page.tsx` fetches all three APIs in parallel using `Promise.allSettled` and merges results
+
+### Service type consolidation
+- `types/index.ts`: ServiceType reduced from 7 to 5 values: `"shelter" | "wifi" | "water" | "medical" | "food"` (removed "power" and "cooling")
+- `components/ServiceTag.tsx`: SERVICE_CONFIG updated to match
+- `lib/demo-data.ts`: all "power" and "cooling" values replaced with "shelter"
+- `app/api/arcgis-resources/route.ts`: `services.push("cooling")` changed to `services.push("shelter")`
+
+### UI cleanup
+- Removed "Resources" plain nav link from Navbar (kept "Find Help Now" button)
+- Removed Type filter row from left panel (was showing Cooling Center, Hydration Station, etc.)
+- Removed `typeFilter` state and `allTypes` useMemo from page.tsx
+- `DEMO_RESOURCES` no longer used as initial state; page starts with `[]` and live data populates it
+- Removed `DEMO_RESOURCES` import from page.tsx
+- Navbar is now full-width (`w-full px-6` instead of `max-w-5xl mx-auto`)
+- Brand renamed from "ReliefRoute" to "CrisisMap" in Navbar
+- Status filter now only shows "All" and "Open" (removed "Limited")
+
+### Bug fixes
+- Map not rendering: wrapper div height pattern fixed (height on parent div, Map uses `style={{ width: '100%', height: '100%' }}`)
+- Parker Public Library showing as best match on first load: fixed by calling `update()` immediately in BoundsWatcher effect
+- Card click not panning map: `PanController` + `panTarget` state added to ResourceMap
 
 ---
 
-## Files Changed (this session)
+## Files Changed
 
 ```
-app/api/arcgis-resources/route.ts   (new)
-app/api/heat-alerts/route.ts        (new)
-components/HeatAlertBanner.tsx      (new)
-components/ResourceMap.tsx          (center, zoom, height, Tailwind class fixes)
-app/resources/page.tsx              (ArcGIS fetch, heat alert banner, map prominence)
-HANDOFF.md                          (updated)
+app/resources/page.tsx              (major rewrite: two-column layout, multi-source fetch, filter cleanup)
+components/ResourceMap.tsx          (BoundsWatcher, PanController, hover props, zoom control, height fix)
+components/ResourceCard.tsx         (isHovered, onMouseEnter, onMouseLeave props)
+components/Navbar.tsx               (full-width, CrisisMap branding, removed Resources link)
+components/ServiceTag.tsx           (removed power/cooling from SERVICE_CONFIG)
+types/index.ts                      (ServiceType reduced to 5 values)
+lib/demo-data.ts                    (power/cooling replaced with shelter, no longer used as initial state)
+app/api/arcgis-resources/route.ts   (MongoDB-backed sync, returnDocument fix, shelter service)
+app/api/wifi-resources/route.ts     (new: Phoenix City Wi-Fi GeoJSON)
+app/api/medical-resources/route.ts  (new: OSM Overpass medical facilities)
+HANDOFF.md                          (this file)
 ```
 
 ---
@@ -71,62 +88,64 @@ HANDOFF.md                          (updated)
 ## Commands Run
 
 ```bash
-npm run build    # passes — 7 routes registered, zero TypeScript errors
+npm run build
+# Result: exits 0, 9 routes registered, zero TypeScript errors
+# Routes: /, /_not-found, /api/arcgis-resources, /api/heat-alerts,
+#         /api/medical-resources, /api/reports, /api/resources,
+#         /api/seed, /api/wifi-resources, /resources
 ```
 
 ---
 
 ## What Works
 
-- `npm run build` exits 0, all routes compile clean
-- Map renders centered on Phoenix/Scottsdale/Tempe at zoom 11, 60vh tall
-- `/api/arcgis-resources` queries the live Arizona ADHS dataset filtered to the three cities
-- `/api/heat-alerts` queries NWS; currently returns `[]` (no active heat alerts — pre-season, May–Sep)
-- `HeatAlertBanner` renders automatically when NWS returns active heat events; dismissable
-- Status-colored pins, InfoWindow, marker-to-card scroll, type/trust/service/status filters all work with ArcGIS data
-- Page header badge and subheader dynamically reflect whether live or demo data is loaded
-- All existing filter, heatmap toggle, and scroll-to-card behavior preserved
+- `npm run build` exits 0 with no TypeScript errors
+- Three data sources load in parallel: ArcGIS cooling centers (via MongoDB cache), Phoenix Wi-Fi hotspots, OSM medical facilities
+- Map shows Phoenix metro at zoom 10; list reflects only resources visible in the current viewport
+- Hover and click cross-linking between map markers and list cards works in both directions
+- Card click pans the map to that resource's coordinates
+- MongoDB upserts ArcGIS records on first load; falls back to direct ArcGIS fetch if Atlas is unreachable
+- No deprecated Mongoose warnings in console
+- "Show more" zooms out to reveal more resources in the list
+- HeatAlertBanner still renders full-width above the two-column layout
 
 ---
 
 ## What Does Not Work
 
-- **ArcGIS `SeasonStatus = "Inactive"`** — the ADHS network is seasonal (May–Sep). Most or all records will show `status: "closed"` until the season opens. Use the "All" status filter to see all locations. This is correct behavior reflecting real-world data.
-- **No community report form UI** (Part 4)
-- **MongoDB Atlas IP allowlist** still needs to be configured before `/api/reports` and `/api/seed` work for live DB. The ArcGIS flow does not depend on MongoDB.
-- **Heatmap visualization library** must be enabled in Google Cloud Console. Silently no-ops if not enabled.
+- ArcGIS ADHS data is seasonal (May–Sep active). Most Phoenix cooling centers show `status: "closed"` or `"unknown"` until summer. Open resources tend to be in remote AZ cities like Parker, Yuma, and Somerton. This is correct real-world behavior, not a bug.
+- MongoDB Atlas IP allowlist must be configured for MongoDB persistence to work. The ArcGIS flow degrades gracefully without it.
+- Heatmap visualization requires the "Maps JavaScript API" visualization library to be enabled in Google Cloud Console. Silently no-ops if not enabled.
+- No community report form UI exists yet (Part 4 not started).
+- Wi-Fi resources have no hours data (the field is absent from the Phoenix city dataset).
 
 ---
 
 ## Blockers
 
-None blocking the demo. The app runs cleanly on demo data without any external configuration.
+None blocking the demo. The app runs cleanly without any external configuration.
 
-Optional:
-- Atlas IP allowlist for MongoDB (Part 4 community reports)
-- Google Cloud Console: enable "Maps JavaScript API" visualization library for heatmap
+Optional blockers for Part 4:
+- MongoDB Atlas IP allowlist required for `/api/reports` to persist community reports
+- ArcGIS resource IDs (`arcgis-*`) do not exist in the MongoDB resources collection, so reporting on ArcGIS resources will return a 404 from `/api/reports` unless those records are first synced (the sync already runs via `/api/arcgis-resources` on first load)
 
 ---
 
-## Exact Next Task
+## Next Task
 
-**Part 4 — Community Report Form + Live Trust Score Updates**
+**Part 4 — Community Report Form**
 
-1. **Report form UI** (new `components/ReportForm.tsx` modal):
-   - Trigger: "Report Status" button on each ResourceCard (add it as a new optional prop/callback)
-   - Fields: `statusReported` (open/limited/closed), `servicesAvailable` (checkboxes), `crowdLevel` (empty/moderate/crowded), `note` (textarea)
-   - `POST /api/reports` with the resource's `id` as `resourceId`
-   - On success: re-fetch `/api/arcgis-resources` to refresh trust scores and status in the map and list
-   - Show inline success message or toast
+1. Build `components/ReportForm.tsx` modal:
+   - Trigger: "Report Status" button on each ResourceCard
+   - Fields: `statusReported` (radio: open / limited / closed), `note` (textarea)
+   - POST to `/api/reports` with `resourceId`
+   - On success: show inline confirmation, then re-fetch all three resource APIs to refresh the map
 
-2. **Wiring**:
-   - Add `onReport?: (r: Resource) => void` prop to `ResourceCard`
-   - Pass it from `ResourcesContent` with a handler that opens `ReportForm` for the selected resource
-   - After report submission, call the resource refresh function already in state
+2. Add `onReport?: () => void` prop to ResourceCard — renders a small "Report" button in the card footer
 
-3. **Trust score** (backend already complete in `POST /api/reports`):
-   - open → +2, limited → −1, closed → −3, clamped to [0, 100]
-   - Note: ArcGIS-sourced records have `id = "arcgis-{OBJECTID}"`, which won't match MongoDB. Either seed ArcGIS data into MongoDB first, or handle the case where `resourceId` is not found in MongoDB gracefully.
+3. Wire from page.tsx: open ReportForm modal for the selected resource
+
+4. Handle the ArcGIS ID edge case: records synced to MongoDB by `/api/arcgis-resources` use IDs like `arcgis-12345`. The `/api/reports` route does a MongoDB lookup by `resourceId`. Because the sync runs automatically on first load, these records should exist in MongoDB by the time the user tries to report. Test this flow end-to-end and handle a missing-resource 404 gracefully on the frontend (show a soft error message rather than crashing).
 
 ---
 
@@ -134,19 +153,21 @@ Optional:
 
 `junior-frontend-dev`
 
-Part 4 is pure UI: a report modal, one POST call, and a list refresh. Backend is complete. The one edge case to handle is that ArcGIS resource IDs (`arcgis-*`) don't exist in MongoDB — the report route will return a 404 for those. Options: (a) seed ArcGIS data into MongoDB via `/api/seed` after updating `lib/demo-data.ts` with ArcGIS records, or (b) have the report form store reports in MongoDB without updating the resource's trust score (log-only mode).
+Part 4 is pure UI work: a report modal, one POST call, and a list refresh. The backend `/api/reports` route with trust score logic is already complete. The main risk is the ArcGIS ID edge case described above — handle it gracefully on the frontend.
 
 ---
 
 ## Notes for Next Teammate
 
-- **ArcGIS endpoint**: `FeatureServer/19`, layer name `AZCoolingandHydration`, org `mpVYz37anSdrK4d8`
-- **ArcGIS geometry**: `{ x: longitude, y: latitude }` when `outSR=4326`
-- **City filter**: `UPPER(City) IN ('PHOENIX','SCOTTSDALE','TEMPE')` — UPPER() handles mixed-case data
-- **Seasonal data**: ADHS runs May–Sep; `SeasonStatus = "Active"` only during that window
-- **NWS User-Agent required**: NWS API returns 403 without a descriptive `User-Agent` header
-- **HeatAlertBanner placement**: it lives outside the `max-w-5xl` container so it spans full page width. Do not move it inside.
-- **ResourceMap center**: `{ lat: 33.456, lng: -111.980 }` — geometric center of the three cities
-- **API routes use Node runtime** — do not change to Edge runtime (Mongoose incompatibility)
-- **`MONGODB_URI` in `.env`**, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env`
-- **`/api/seed`** seeds MongoDB from `lib/demo-data.ts` (LA data) — not ArcGIS data. Update `lib/demo-data.ts` if you want to seed AZ data into MongoDB for Part 4 trust score updates.
+- The app is branded "CrisisMap" in the Navbar but the project folder and CLAUDE.md still refer to "ReliefRoute". Do not rename files or folders unless asked.
+- ArcGIS endpoint: `FeatureServer/19`, layer `AZCoolingandHydration`, org `mpVYz37anSdrK4d8`
+- ArcGIS geometry format: `{ x: longitude, y: latitude }` when `outSR=4326`
+- Seasonal data: ADHS runs May–Sep; most records will be closed until then. Use the "All" status filter to see all locations during development.
+- NWS User-Agent header is required — NWS returns 403 without it. Already set in `/api/heat-alerts/route.ts`.
+- HeatAlertBanner must stay outside the two-column wrapper so it spans full page width. Do not move it inside.
+- ResourceMap center: `{ lat: 33.456, lng: -111.980 }` — Phoenix metro center
+- All API routes use Node runtime. Do not switch to Edge runtime (Mongoose is incompatible).
+- Environment variables: `MONGODB_URI` and `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in `.env`
+- Run dev: `npm run dev`. Build check: `npm run build`.
+- `/api/seed` seeds MongoDB from `lib/demo-data.ts` (LA demo data). It does not seed ArcGIS data. ArcGIS data is seeded automatically on the first call to `/api/arcgis-resources`.
+- Do not import `DEMO_RESOURCES` into page.tsx — it was intentionally removed. The page now starts with an empty array and populates from live APIs.
