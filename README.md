@@ -45,6 +45,32 @@ curl -X POST http://localhost:3000/api/seed
 - Optional heatmap overlay toggle (requires Maps Visualization API)
 - NWS heat alert banner above the map when Arizona heat warnings are active
 
+### Emergency scenario selection and pre-applied filters
+
+The homepage presents four emergency types. Selecting one navigates to `/resources?emergency=<id>` and immediately pre-applies the service filters most relevant to that emergency. The user lands on the map already narrowed to what they actually need — no manual filter setup required.
+
+The pre-applied filters per scenario are defined in `lib/demo-data.ts` under `defaultNeeds` and read on the resources page via the `emergency` query parameter:
+
+```
+Power Outage  →  shelter, wifi
+Wildfire      →  shelter, water, medical
+Extreme Heat  →  shelter, water
+Flood         →  shelter, food, water
+```
+
+Implementation: `activeServices` state is initialized using a lazy initializer that reads `scenario.defaultNeeds` at mount time:
+
+```ts
+const scenario = EMERGENCY_SCENARIOS.find((s) => s.id === emergencyId) ?? EMERGENCY_SCENARIOS[0];
+const [activeServices, setActiveServices] = useState<ServiceType[]>(
+  () => scenario.defaultNeeds
+);
+```
+
+Because this uses a lazy initializer (function passed to `useState`) rather than a direct value, it only runs once on mount and does not re-initialize if the component re-renders. The user can clear or change the filters freely after landing on the map — this is just the starting state.
+
+The homepage cards display the pre-applied service tags visually so users know exactly what they will see before clicking through.
+
 ### Filters
 
 - Status filter: All / Open
@@ -59,7 +85,7 @@ Each card shows: name, resource type, status badge, address, service tags, optio
 
 ### Best Match
 
-The card with the highest `recommendationScore` among open resources is pinned with a "⭐ Best Match" badge. Only open resources qualify — limited and closed are excluded regardless of score.
+The card with the highest `recommendationScore` among open resources is pinned with a "Best Match" badge. Only open resources qualify — limited and closed are excluded regardless of score.
 
 ### Community report form
 
@@ -296,7 +322,7 @@ Store in `.env` or `.env.local`. Never commit real values. See `.env.example` fo
 2. Three data sources load in parallel: AZ cooling centers, city Wi-Fi hotspots, OSM medical facilities
 3. NWS heat alert banner appears at the top if any Arizona heat warnings are currently active
 4. Filter by status "Open" and service "Wi-Fi" to narrow to open Wi-Fi locations
-5. The ⭐ Best Match card highlights the highest-scoring open resource in the current viewport
+5. The Best Match card highlights the highest-scoring open resource in the current viewport
 6. Click any card → map pans to that pin; click any pin → card scrolls into view
 7. Click "Report status" on a card, select "Limited", optionally add a note, and submit
 8. Map refreshes — the card now shows "Limited" status, updated trust score bar, and "Updated just now"

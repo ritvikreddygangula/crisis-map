@@ -40,7 +40,11 @@ function ResourcesContent() {
   const [heatAlerts, setHeatAlerts] = useState<HeatAlert[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [activeServices, setActiveServices] = useState<ServiceType[]>([]);
+  // Pre-apply the needs from the selected emergency scenario so the map
+  // arrives filtered to what's actually relevant (shelter+wifi for outages, etc.)
+  const [activeServices, setActiveServices] = useState<ServiceType[]>(
+    () => scenario.defaultNeeds
+  );
   const [statusFilter, setStatusFilter] = useState<ResourceStatus | "all">("all");
   const [minTrust, setMinTrust] = useState<number>(0);
   const [showHeatmap, setShowHeatmap] = useState(false);

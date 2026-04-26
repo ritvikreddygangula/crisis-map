@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EMERGENCY_SCENARIOS } from "@/lib/demo-data";
+import ServiceTag from "@/components/ServiceTag";
 
 export default function Home() {
   return (
@@ -24,12 +25,12 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/resources"
+            <a
+              href="#emergency-select"
               className="inline-flex items-center justify-center gap-2 bg-white text-red-700 font-semibold px-8 py-3 rounded-xl hover:bg-red-50 transition-colors text-base"
             >
-              🗺️ View Resources Near Me
-            </Link>
+              🚨 Select Your Emergency
+            </a>
             <a
               href="#how-it-works"
               className="inline-flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white font-medium px-8 py-3 rounded-xl transition-colors text-base"
@@ -41,34 +42,55 @@ export default function Home() {
       </section>
 
       {/* Emergency type selector */}
-      <section className="py-14 px-4 bg-gray-50">
-        <div className="max-w-3xl mx-auto">
+      <section id="emergency-select" className="py-14 px-4 bg-gray-50">
+        <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
-            What&apos;s the emergency?
+            What&apos;s your emergency?
           </h2>
           <p className="text-gray-500 text-center mb-8 text-sm">
-            Select your situation and we&apos;ll show the most relevant resources.
+            Pick your situation — we&apos;ll open the map pre-filtered to exactly what you need.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {EMERGENCY_SCENARIOS.map((scenario) => (
               <Link
                 key={scenario.id}
                 href={`/resources?emergency=${scenario.id}`}
-                className="group flex flex-col items-center gap-3 bg-white border border-gray-200 rounded-2xl p-5 hover:border-red-400 hover:shadow-md transition-all text-center"
+                className="group flex items-start gap-4 bg-white border border-gray-200 rounded-2xl p-5 hover:border-red-400 hover:shadow-md transition-all"
               >
-                <span className="text-4xl group-hover:scale-110 transition-transform inline-block">
+                {/* Icon */}
+                <span className="text-4xl group-hover:scale-110 transition-transform inline-block shrink-0 mt-0.5">
                   {scenario.icon}
                 </span>
-                <div>
-                  <div className="font-semibold text-gray-900 text-sm">{scenario.label}</div>
-                  <div className="text-xs text-gray-500 mt-0.5 leading-tight">
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-gray-900 text-base leading-tight">
+                    {scenario.label}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5 mb-3 leading-snug">
                     {scenario.description}
                   </div>
+
+                  {/* Pre-applied filters */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {scenario.defaultNeeds.map((need) => (
+                      <ServiceTag key={need} service={need} small />
+                    ))}
+                  </div>
                 </div>
+
+                {/* Arrow */}
+                <span className="text-gray-300 group-hover:text-red-400 transition-colors text-lg shrink-0 self-center">
+                  →
+                </span>
               </Link>
             ))}
           </div>
+
+          <p className="text-center text-xs text-gray-400 mt-4">
+            Filters are applied automatically — you can adjust them on the map.
+          </p>
         </div>
       </section>
 
@@ -140,17 +162,17 @@ export default function Home() {
       {/* CTA */}
       <section className="py-16 px-4 bg-white text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-3">
-          Ready to find help?
+          Not sure what you need?
         </h2>
         <p className="text-gray-500 mb-6 text-sm">
-          Browse all emergency resources in the Los Angeles demo scenario.
+          Browse all open resources on the map without any filters.
         </p>
-        <Link
-          href="/resources"
+        <a
+          href="#emergency-select"
           className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-8 py-3 rounded-xl transition-colors text-base"
         >
-          View All Resources →
-        </Link>
+          Choose your emergency →
+        </a>
       </section>
     </div>
   );
