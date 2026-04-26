@@ -128,6 +128,12 @@ function ResourcesContent() {
 
   const bestPick = useMemo(() => getBestResource(listItems), [listItems]);
 
+  // Best pick is always rendered first regardless of sort position.
+  const orderedListItems = useMemo(() => {
+    if (!bestPick) return listItems;
+    return [bestPick, ...listItems.filter((r) => r.id !== bestPick.id)];
+  }, [listItems, bestPick]);
+
   const hasActiveFilters =
     statusFilter !== "all" ||
     minTrust > 0 ||
@@ -244,7 +250,7 @@ function ResourcesContent() {
             ) : (
               <span className="text-xs text-gray-500">
                 Showing{" "}
-                <span className="font-semibold text-gray-700">{listItems.length}</span>{" "}
+                <span className="font-semibold text-gray-700">{orderedListItems.length}</span>{" "}
                 of{" "}
                 <span className="font-semibold text-gray-700">{filtered.length}</span>
               </span>
@@ -258,7 +264,7 @@ function ResourcesContent() {
                   Clear filters
                 </button>
               )}
-              {listItems.length < filtered.length && (
+              {orderedListItems.length < filtered.length && (
                 <button
                   onClick={() => setMapZoom((z) => Math.max(z - 2, 4))}
                   className="text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full border border-blue-200 transition-colors"
@@ -277,7 +283,7 @@ function ResourcesContent() {
                   <div key={i} className="h-36 bg-gray-100 rounded-2xl animate-pulse" />
                 ))}
               </>
-            ) : listItems.length === 0 ? (
+            ) : orderedListItems.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <div className="text-3xl mb-2">🔍</div>
                 <p className="font-medium text-sm">No resources match your filters.</p>
@@ -289,7 +295,7 @@ function ResourcesContent() {
                 </button>
               </div>
             ) : (
-              listItems.map((r) => (
+              orderedListItems.map((r) => (
                 <div
                   key={r.id}
                   id={`card-${r.id}`}
