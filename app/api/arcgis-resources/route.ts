@@ -79,7 +79,7 @@ export async function GET() {
             ResourceModel.findOneAndUpdate(
               { id: resource.id },
               resource,
-              { upsert: true, new: true, setDefaultsOnInsert: true }
+              { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
             )
           )
         );

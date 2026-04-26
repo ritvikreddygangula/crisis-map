@@ -158,7 +158,7 @@ function ResourcesContent() {
             <div>
               <span className="text-xs text-gray-500 font-medium block mb-1.5">Status</span>
               <div className="flex gap-1.5 flex-wrap">
-                {(["all", "open", "limited"] as const).map((s) => (
+                {(["all", "open"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
