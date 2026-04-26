@@ -91,8 +91,9 @@ function BoundsWatcher({
 
   useEffect(() => {
     if (!map) return;
-    const listener = map.addListener('bounds_changed', () => {
-      const bounds = map.getBounds();
+
+    function update() {
+      const bounds = map!.getBounds();
       if (!bounds) return;
       const visible = new Set(
         resources
@@ -100,8 +101,17 @@ function BoundsWatcher({
           .map((r) => r.id)
       );
       onBoundsChanged(visible);
-    });
-    return () => google.maps.event.removeListener(listener);
+    }
+
+    // Run immediately — catches the case where resources load after the map is already idle
+    update();
+
+    const tl = map.addListener('tilesloaded', update);
+    const bc = map.addListener('bounds_changed', update);
+    return () => {
+      google.maps.event.removeListener(tl);
+      google.maps.event.removeListener(bc);
+    };
   }, [map, resources, onBoundsChanged]);
 
   return null;
