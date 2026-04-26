@@ -110,7 +110,10 @@ function ResourcesContent() {
         if (statusFilter !== "all" && r.status !== statusFilter) return false;
         if (r.trustScore < minTrust) return false;
         if (activeServices.length > 0) {
-          if (!activeServices.every((s) => r.services.includes(s))) return false;
+          // OR logic: show resources that offer at least one of the selected services.
+          // AND would intersect to zero for multi-service emergency presets (e.g. shelter+wifi
+          // finds nothing because no single resource offers both).
+          if (!activeServices.some((s) => r.services.includes(s))) return false;
         }
         return true;
       })
