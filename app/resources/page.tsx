@@ -4,6 +4,7 @@ import { Suspense, useState, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { EMERGENCY_SCENARIOS, getBestResource } from "@/lib/demo-data";
 import ResourceCard from "@/components/ResourceCard";
+import ReportForm from "@/components/ReportForm";
 import ResourceMap from "@/components/ResourceMap";
 import HeatAlertBanner from "@/components/HeatAlertBanner";
 import ServiceTag, { SERVICE_CONFIG } from "@/components/ServiceTag";
@@ -46,6 +47,7 @@ function ResourcesContent() {
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [mapZoom, setMapZoom] = useState(10);
   const [panTarget, setPanTarget] = useState<{ lat: number; lng: number } | null>(null);
+  const [reportingResource, setReportingResource] = useState<Resource | null>(null);
 
   useEffect(() => {
     Promise.allSettled([
@@ -296,12 +298,41 @@ function ResourcesContent() {
                     isHovered={r.id === hoveredId}
                     onMouseEnter={() => setHoveredId(r.id)}
                     onMouseLeave={() => setHoveredId(null)}
+                    onReport={() => setReportingResource(r)}
                   />
                 </div>
               ))
             )}
           </div>
         </div>
+
+        {/* Report form modal */}
+        {reportingResource && (
+          <ReportForm
+            resource={reportingResource}
+            onClose={() => setReportingResource(null)}
+            onSuccess={() => {
+              setReportingResource(null);
+              // re-fetch all three APIs to refresh the map
+              setLoading(true);
+              Promise.allSettled([
+                fetch("/api/arcgis-resources").then((r) => r.json()),
+                fetch("/api/wifi-resources").then((r) => r.json()),
+                fetch("/api/medical-resources").then((r) => r.json()),
+              ])
+                .then((results) => {
+                  const merged: Resource[] = [];
+                  for (const result of results) {
+                    if (result.status === "fulfilled" && Array.isArray(result.value))
+                      merged.push(...result.value);
+                  }
+                  if (merged.length > 0) setResources(merged);
+                })
+                .catch(() => {})
+                .finally(() => setLoading(false));
+            }}
+          />
+        )}
 
         {/* RIGHT COLUMN: map (sticky, fills viewport height) */}
         <div className="flex-1 sticky top-0 h-full flex flex-col min-h-75">

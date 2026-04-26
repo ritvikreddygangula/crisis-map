@@ -88,13 +88,38 @@ export async function GET() {
           services: ["medical" as const],
           capacity: null,
           trustScore,
-          lastUpdated: new Date().toISOString(),
+          // Fixed 24-hour-ago timestamp — OSM data revalidates daily, not per request.
+          lastUpdated: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
           notes: noteParts.join(" "),
           recommendationScore,
         };
       });
 
-    return NextResponse.json(resources);
+    // Merge community overrides from MongoDB (status, trustScore, lastUpdated).
+    try {
+      const { connectDB } = await import("@/lib/mongodb");
+      const { ResourceModel } = await import("@/models/Resource");
+      await connectDB();
+
+      const ids = resources.map((r) => r.id);
+      const dbDocs = await ResourceModel.find({ id: { $in: ids } }).lean();
+      const dbMap = new Map(dbDocs.map((d) => [d.id, d]));
+
+      return NextResponse.json(
+        resources.map((r) => {
+          const db = dbMap.get(r.id);
+          if (!db) return r;
+          return {
+            ...r,
+            status: db.status,
+            trustScore: db.trustScore,
+            lastUpdated: db.lastUpdated,
+          };
+        })
+      );
+    } catch {
+      return NextResponse.json(resources);
+    }
   } catch {
     return NextResponse.json([]);
   }

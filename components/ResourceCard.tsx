@@ -36,6 +36,7 @@ interface Props {
   isHovered?: boolean;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  onReport?: () => void;
 }
 
 export default function ResourceCard({
@@ -45,6 +46,7 @@ export default function ResourceCard({
   isHovered = false,
   onMouseEnter,
   onMouseLeave,
+  onReport,
 }: Props) {
   const status = STATUS_CONFIG[resource.status];
 
@@ -116,14 +118,27 @@ export default function ResourceCard({
         </p>
       )}
 
-      {/* Footer: trust + updated */}
+      {/* Footer: trust + updated + report */}
       <div className="flex items-center justify-between gap-4 pt-1">
         <div className="flex-1">
           <div className="text-xs text-gray-400 mb-1">Trust score</div>
           <TrustBar score={resource.trustScore} />
         </div>
-        <div className="text-right text-xs text-gray-400 flex-shrink-0">
-          Updated {timeAgo(resource.lastUpdated)}
+        <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
+          <div className="text-xs text-gray-400">
+            Updated {timeAgo(resource.lastUpdated)}
+          </div>
+          {onReport && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onReport();
+              }}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              Report status
+            </button>
+          )}
         </div>
       </div>
     </div>
