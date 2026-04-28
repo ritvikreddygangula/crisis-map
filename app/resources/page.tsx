@@ -40,8 +40,6 @@ function ResourcesContent() {
   const [heatAlerts, setHeatAlerts] = useState<HeatAlert[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  // Pre-apply the needs from the selected emergency scenario so the map
-  // arrives filtered to what's actually relevant (shelter+wifi for outages, etc.)
   const [activeServices, setActiveServices] = useState<ServiceType[]>(
     () => scenario.defaultNeeds
   );
@@ -110,16 +108,11 @@ function ResourcesContent() {
         if (statusFilter !== "all" && r.status !== statusFilter) return false;
         if (r.trustScore < minTrust) return false;
         if (activeServices.length > 0) {
-          // OR logic: show resources that offer at least one of the selected services.
-          // AND would intersect to zero for multi-service emergency presets (e.g. shelter+wifi
-          // finds nothing because no single resource offers both).
           if (!activeServices.some((s) => r.services.includes(s))) return false;
         }
         return true;
       })
-      .sort(
-        (a, b) => (b.recommendationScore ?? 0) - (a.recommendationScore ?? 0)
-      );
+      .sort((a, b) => (b.recommendationScore ?? 0) - (a.recommendationScore ?? 0));
   }, [resources, statusFilter, minTrust, activeServices]);
 
   const listItems = useMemo(() => {
@@ -128,59 +121,69 @@ function ResourcesContent() {
 
   const bestPick = useMemo(() => getBestResource(listItems), [listItems]);
 
-  // Best pick is always rendered first regardless of sort position.
   const orderedListItems = useMemo(() => {
     if (!bestPick) return listItems;
     return [bestPick, ...listItems.filter((r) => r.id !== bestPick.id)];
   }, [listItems, bestPick]);
 
   const hasActiveFilters =
-    statusFilter !== "all" ||
-    minTrust > 0 ||
-    activeServices.length > 0;
+    statusFilter !== "all" || minTrust > 0 || activeServices.length > 0;
 
   const isArcGISData = resources.some((r) => r.id.startsWith("arcgis-"));
 
   return (
     <div className="flex flex-col">
-      {/* NWS heat alert banner — full bleed above two-column layout */}
       <HeatAlertBanner alerts={heatAlerts} />
 
-      {/* Two-column layout: left = list, right = map */}
       <div
         className="flex flex-col sm:flex-row"
         style={{ height: "calc(100vh - 64px)" }}
       >
-        {/* LEFT COLUMN: filters + list (scrollable) */}
+        {/* ── LEFT: filters + list ─────────────────────────── */}
         <div
-          className="w-full sm:w-105 shrink-0 flex flex-col overflow-y-auto border-r border-gray-200 bg-white"
+          className="w-full sm:w-105 shrink-0 flex flex-col overflow-y-auto border-r border-slate-200 bg-white custom-scroll"
           style={{ maxHeight: "calc(100vh - 64px)" }}
         >
           {/* Header */}
-          <div className="px-4 pt-4 pb-2 border-b border-gray-100">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xl">{scenario.icon}</span>
-              <h1 className="text-base font-bold text-gray-900">{scenario.label}</h1>
-              <span className="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">
-                {isArcGISData ? "Live · AZ" : "Demo · LA"}
-              </span>
+          <div className="px-4 pt-4 pb-3 border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-lg shadow-sm flex-shrink-0">
+                {scenario.icon}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm font-bold text-slate-900 truncate">{scenario.label}</h1>
+                  <span
+                    className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
+                      isArcGISData
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-orange-100 text-orange-700"
+                    }`}
+                  >
+                    {isArcGISData ? "Live · AZ" : "Demo · LA"}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{scenario.description}</p>
+              </div>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="px-4 py-3 border-b border-gray-100 space-y-3">
+          <div className="px-4 py-3.5 border-b border-slate-100 space-y-4 bg-slate-50/50">
             {/* Status filter */}
             <div>
-              <span className="text-xs text-gray-500 font-medium block mb-1.5">Status</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                Status
+              </span>
               <div className="flex gap-1.5 flex-wrap">
                 {(["all", "open"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
-                    className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors ${
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-all duration-150 ${
                       statusFilter === s
-                        ? "bg-gray-900 text-white border-gray-900"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:bg-slate-50"
                     }`}
                   >
                     {STATUS_LABELS[s]}
@@ -191,12 +194,14 @@ function ResourcesContent() {
 
             {/* Services filter */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-gray-500 font-medium">Services</span>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Services
+                </span>
                 {activeServices.length > 0 && (
                   <button
                     onClick={() => setActiveServices([])}
-                    className="text-xs text-red-600 hover:text-red-800 font-medium"
+                    className="text-xs text-cyan-600 hover:text-cyan-800 font-semibold transition-colors"
                   >
                     Clear
                   </button>
@@ -209,10 +214,10 @@ function ResourcesContent() {
                     <button
                       key={s}
                       onClick={() => toggleService(s)}
-                      className={`transition-all ${
+                      className={`transition-all duration-150 ${
                         active
-                          ? "ring-2 ring-gray-900 ring-offset-1 rounded-full"
-                          : "opacity-70 hover:opacity-100"
+                          ? "ring-2 ring-slate-900 ring-offset-1 rounded-full scale-105"
+                          : "opacity-65 hover:opacity-100 hover:scale-105"
                       }`}
                     >
                       <ServiceTag service={s} small />
@@ -222,18 +227,20 @@ function ResourcesContent() {
               </div>
             </div>
 
-            {/* Min. trust filter */}
+            {/* Min trust filter */}
             <div>
-              <span className="text-xs text-gray-500 font-medium block mb-1.5">Min. trust</span>
-              <div className="flex gap-1">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-2">
+                Min. trust
+              </span>
+              <div className="flex gap-1.5">
                 {TRUST_OPTIONS.map(({ label, value }) => (
                   <button
                     key={label}
                     onClick={() => setMinTrust(value)}
-                    className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-all duration-150 ${
                       minTrust === value
-                        ? "bg-gray-900 text-white border-gray-900"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:bg-slate-50"
                     }`}
                   >
                     {label}
@@ -243,23 +250,24 @@ function ResourcesContent() {
             </div>
           </div>
 
-          {/* Count row + Show more */}
-          <div className="px-4 py-2 flex items-center justify-between border-b border-gray-100 bg-gray-50">
+          {/* Count row */}
+          <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-100">
             {loading ? (
-              <div className="h-3.5 w-28 bg-gray-200 rounded animate-pulse" />
+              <div className="h-3 w-28 bg-slate-200 rounded-full animate-pulse" />
             ) : (
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-slate-500">
                 Showing{" "}
-                <span className="font-semibold text-gray-700">{orderedListItems.length}</span>{" "}
-                of{" "}
-                <span className="font-semibold text-gray-700">{filtered.length}</span>
+                <span className="font-bold text-slate-800">{orderedListItems.length}</span>
+                {" of "}
+                <span className="font-bold text-slate-800">{filtered.length}</span>
+                {" resources"}
               </span>
             )}
             <div className="flex items-center gap-2">
               {hasActiveFilters && (
                 <button
                   onClick={clearAllFilters}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                  className="text-xs text-red-500 hover:text-red-700 font-semibold transition-colors"
                 >
                   Clear filters
                 </button>
@@ -267,7 +275,7 @@ function ResourcesContent() {
               {orderedListItems.length < filtered.length && (
                 <button
                   onClick={() => setMapZoom((z) => Math.max(z - 2, 4))}
-                  className="text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full border border-blue-200 transition-colors"
+                  className="text-xs font-semibold text-cyan-600 hover:text-cyan-800 bg-cyan-50 hover:bg-cyan-100 px-2.5 py-1 rounded-full border border-cyan-200 transition-all"
                 >
                   Show more
                 </button>
@@ -276,20 +284,25 @@ function ResourcesContent() {
           </div>
 
           {/* Resource list */}
-          <div className="flex-1 px-4 py-3 space-y-3">
+          <div className="flex-1 px-4 py-3.5 space-y-3">
             {loading ? (
               <>
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-36 bg-gray-100 rounded-2xl animate-pulse" />
+                  <div
+                    key={i}
+                    className="h-36 bg-slate-100 rounded-2xl animate-pulse"
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  />
                 ))}
               </>
             ) : orderedListItems.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <div className="text-3xl mb-2">🔍</div>
-                <p className="font-medium text-sm">No resources match your filters.</p>
+              <div className="text-center py-14 text-slate-400">
+                <div className="text-4xl mb-3">🔍</div>
+                <p className="font-semibold text-sm text-slate-600">No resources match your filters.</p>
+                <p className="text-xs mt-1 mb-4 text-slate-400">Try broadening your search.</p>
                 <button
                   onClick={clearAllFilters}
-                  className="mt-2 text-sm text-red-600 hover:text-red-800 font-medium"
+                  className="text-sm font-semibold text-cyan-600 hover:text-cyan-800 underline transition-colors"
                 >
                   Clear all filters
                 </button>
@@ -326,7 +339,6 @@ function ResourcesContent() {
             onClose={() => setReportingResource(null)}
             onSuccess={() => {
               setReportingResource(null);
-              // re-fetch all three APIs to refresh the map
               setLoading(true);
               Promise.allSettled([
                 fetch("/api/arcgis-resources").then((r) => r.json()),
@@ -347,43 +359,51 @@ function ResourcesContent() {
           />
         )}
 
-        {/* RIGHT COLUMN: map (sticky, fills viewport height) */}
+        {/* ── RIGHT: map ────────────────────────────────────── */}
         <div className="flex-1 sticky top-0 h-full flex flex-col min-h-75">
           {/* Map toolbar */}
-          <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200 shrink-0">
-            <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-green-600" />
-                Open
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
-                Limited
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-red-600" />
-                Closed
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
-                Unknown
-              </span>
+          <div className="flex items-center justify-between px-4 py-2.5 bg-white/90 backdrop-blur-sm border-b border-slate-200 shrink-0 shadow-sm">
+            <div className="flex items-center gap-4 text-xs text-slate-500">
+              {[
+                { color: "bg-emerald-500", label: "Open" },
+                { color: "bg-amber-500",   label: "Limited" },
+                { color: "bg-red-500",     label: "Closed" },
+                { color: "bg-slate-400",   label: "Unknown" },
+              ].map(({ color, label }) => (
+                <span key={label} className="flex items-center gap-1.5">
+                  <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
+                  {label}
+                </span>
+              ))}
               {loading && (
-                <span className="text-gray-400 animate-pulse">Loading…</span>
+                <span className="text-slate-400 animate-pulse font-medium">Loading…</span>
               )}
             </div>
-            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showHeatmap}
-                onChange={(e) => setShowHeatmap(e.target.checked)}
-                className="rounded"
-              />
-              Heatmap
+
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none group">
+              <div
+                className={`relative w-8 h-4.5 rounded-full transition-colors duration-200 ${
+                  showHeatmap ? "bg-cyan-500" : "bg-slate-200"
+                }`}
+                style={{ height: "18px" }}
+              >
+                <div
+                  className={`absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-all duration-200 ${
+                    showHeatmap ? "left-4" : "left-0.5"
+                  }`}
+                />
+                <input
+                  type="checkbox"
+                  checked={showHeatmap}
+                  onChange={(e) => setShowHeatmap(e.target.checked)}
+                  className="sr-only"
+                />
+              </div>
+              <span className="font-medium">Heatmap</span>
             </label>
           </div>
 
-          {/* Map fills the rest */}
+          {/* Map */}
           <div className="flex-1">
             <ResourceMap
               resources={filtered}
@@ -408,8 +428,9 @@ export default function ResourcesPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
-          Loading resources…
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 animate-pulse" />
+          <span className="text-sm font-medium">Loading resources…</span>
         </div>
       }
     >
